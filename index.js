@@ -7,6 +7,22 @@ async function getLocalStream() {
   // return navigator.mediaDevices.getUserMedia({ video: true });
 }
 
+function createVideoContainer(userId, stream) {
+  const div = document.createElement("div");
+  div.className = "video-container";
+  const p = document.createElement("p");
+  p.innerHTML = userId;
+  const video = document.createElement("video");
+  video.autoplay = true;
+  video.playsInline = true;
+  video.srcObject = stream;
+  div.appendChild(p);
+  div.appendChild(video);
+  const media = document.getElementById("media");
+  media.appendChild(div);
+  return div;
+}
+
 class Signaling {
   handler = {};
 
@@ -93,21 +109,8 @@ class RTC {
     };
 
     this.pc.ontrack = (e) => {
-      // 整理要考虑  remoteStream 的情况
-
       if (this.container) return;
-
-      const div = document.createElement("div");
-      const p = document.createElement("p");
-      p.innerHTML = "remote: " + this.remoteUserId;
-      const video = document.createElement("video");
-      video.autoplay = true;
-      video.playsInline = true;
-      video.srcObject = e.streams[0];
-      div.appendChild(p);
-      div.appendChild(video);
-      document.body.appendChild(div);
-      this.container = div;
+      this.container = createVideoContainer(this.remoteUserId, e.streams[0]);
     };
 
 
@@ -120,7 +123,8 @@ class RTC {
   release() {
     this.pc.close();
     if (this.container) {
-      document.body.removeChild(this.container);
+      const media = document.getElementById("media");
+      media.removeChild(this.container);
     }
   }
 
@@ -177,18 +181,21 @@ let RTCMap = {};
 let localStream;
 
 joinRoomBtn.onclick = async () => {
-  if (!localStream) {
-    localStream = await getLocalStream();
-    local_video.srcObject = localStream;
-  }
+
 
   const signaling = new Signaling("ws://localhost:8888");
   await signaling.init();
 
-  signaling.bindHandler("JoinRoomRes", ({ id, ids }) => {
+  signaling.bindHandler("JoinRoomRes", async ({ id, ids }) => {
+
+    if (!localStream) {
+      localStream = await getLocalStream();
+    }
+
     userId = id;
     remoteUserIds = ids;
     console.log("my id: ", userId, ids);
+    createVideoContainer(userId, localStream);
 
     for (let i = 0; i < ids.length; i++) {
       const remoteUserId = ids[i];
